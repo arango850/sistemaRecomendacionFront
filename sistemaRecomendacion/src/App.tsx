@@ -1,122 +1,169 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import { useState, useEffect } from 'react'
+import type { UserRecommendation } from './types'
 import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+const API = '/recommendations'
+
+function useAllRecommendations() {
+  const [data, setData] = useState<UserRecommendation[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(API)
+      .then(r => {
+        if (!r.ok) throw new Error(`Error ${r.status}`)
+        return r.json() as Promise<UserRecommendation[]>
+      })
+      .then(setData)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  return { data, loading, error }
+}
+
+function ScoreBadge({ score }: { score: number }) {
+  const color = score >= 4.5 ? 'badge-high' : score >= 4 ? 'badge-mid' : 'badge-low'
+  return <span className={`badge ${color}`}>{score.toFixed(4)}</span>
+}
+
+function UserCard({ user }: { user: UserRecommendation }) {
+  const [expanded, setExpanded] = useState(false)
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="user-card">
+      <button className="user-card-header" onClick={() => setExpanded(e => !e)}>
+        <div className="user-card-title">
+          <span className="user-id">Usuario #{user.user_id}</span>
+          <span className="cluster-badge">Cluster {user.cluster}</span>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+        <div className="user-card-meta">
+          <span className="rec-count">{user.recommendations.length} recomendaciones</span>
+          <span className="chevron">{expanded ? '▲' : '▼'}</span>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+      </button>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
+      {expanded && (
+        <ol className="rec-list">
+          {user.recommendations.map((rec, i) => (
+            <li key={rec.movie_id} className="rec-item">
+              <span className="rec-rank">#{i + 1}</span>
+              <span className="rec-title">{rec.movie_title}</span>
+              <ScoreBadge score={rec.score} />
             </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+          ))}
+        </ol>
+      )}
+    </div>
   )
 }
 
-export default App
+function UserDetail({ userId, onBack }: { userId: number; onBack: () => void }) {
+  const [user, setUser] = useState<UserRecommendation | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    fetch(`${API}/${userId}`)
+      .then(r => {
+        if (r.status === 404) throw new Error('Usuario no encontrado')
+        if (!r.ok) throw new Error(`Error ${r.status}`)
+        return r.json() as Promise<UserRecommendation>
+      })
+      .then(setUser)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [userId])
+
+  return (
+    <div className="detail-view">
+      <button className="back-btn" onClick={onBack}>← Volver</button>
+
+      {loading && <p className="status-msg">Cargando…</p>}
+      {error && <p className="status-msg error">{error}</p>}
+
+      {user && (
+        <>
+          <div className="detail-header">
+            <h2>Usuario #{user.user_id}</h2>
+            <span className="cluster-badge large">Cluster {user.cluster}</span>
+          </div>
+          <p className="detail-sub">{user.recommendations.length} películas recomendadas</p>
+          <ol className="rec-list detailed">
+            {user.recommendations.map((rec, i) => (
+              <li key={rec.movie_id} className="rec-item">
+                <span className="rec-rank">#{i + 1}</span>
+                <span className="rec-title">{rec.movie_title}</span>
+                <ScoreBadge score={rec.score} />
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </div>
+  )
+}
+
+export default function App() {
+  const { data, loading, error } = useAllRecommendations()
+  const [search, setSearch] = useState('')
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    const id = parseInt(search, 10)
+    if (!isNaN(id) && id > 0) setSelectedUserId(id)
+  }
+
+  if (selectedUserId !== null) {
+    return (
+      <div className="app">
+        <header className="app-header">
+          <h1>Sistema de Recomendación</h1>
+          <p className="subtitle">MovieLens · K-Means Clustering</p>
+        </header>
+        <main className="app-main">
+          <UserDetail userId={selectedUserId} onBack={() => setSelectedUserId(null)} />
+        </main>
+      </div>
+    )
+  }
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <h1>Sistema de Recomendación</h1>
+        <p className="subtitle">MovieLens · K-Means Clustering</p>
+      </header>
+
+      <main className="app-main">
+        <form className="search-form" onSubmit={handleSearch}>
+          <input
+            className="search-input"
+            type="number"
+            min="1"
+            placeholder="Buscar por User ID…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <button className="search-btn" type="submit">Buscar</button>
+        </form>
+
+        {loading && <p className="status-msg">Cargando recomendaciones…</p>}
+        {error && <p className="status-msg error">Error al cargar datos: {error}</p>}
+
+        {!loading && !error && (
+          <p className="total-count">{data.length} usuarios cargados</p>
+        )}
+
+        <div className="user-list">
+          {data.map(u => <UserCard key={u.user_id} user={u} />)}
+        </div>
+      </main>
+    </div>
+  )
+}
+
