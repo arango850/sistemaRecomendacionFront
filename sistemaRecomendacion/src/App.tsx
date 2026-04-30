@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import type { UserRecommendation } from './types'
 import './App.css'
 
-const API = '/recommendations'
+const API = `${import.meta.env.VITE_API_URL ?? ''}/recommendations`
 
 function useAllRecommendations() {
   const [data, setData] = useState<UserRecommendation[]>([])
